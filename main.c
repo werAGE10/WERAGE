@@ -1,0 +1,136 @@
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+
+struct Student{
+    char *surname;
+    char *name;
+    char *sex;
+    int age;
+    int group;
+    float mathMark;
+    float physicsMark;
+    float chemistryMark;
+    void (*infoOutput)(struct Student *student);
+};
+
+struct Tree{
+    struct Student data;
+    struct Tree* left;
+    struct Tree* right;
+    int count;
+    void (*add_node)(struct Tree* node, struct Student data);
+    void (*clear)(struct Tree* node);
+};
+
+void tree_add_node(struct Tree* node, struct Student data);
+void tree_clear(struct Tree* node);
+
+struct Tree* tree_init(struct Student data){
+    struct Tree* result = malloc(sizeof(struct Tree));
+    result->data = data;
+    result->count = 1;
+    result->add_node = tree_add_node;
+    result->right = NULL;
+    result->left = NULL;
+    result->clear = tree_clear;
+
+    return result;
+}
+
+
+
+
+
+void tree_add_node(struct Tree* node, struct Student data){
+    if (node->data.age < data.age) {
+        if (node->left == NULL) {
+            node->left = tree_init(data);
+            return;
+        }
+        tree_add_node(node->left, data);
+        return;
+    }
+    if (node->data.age > data.age) {
+        if (node->right == NULL) {
+            node->right = tree_init(data);
+            return;
+        }
+        tree_add_node(node->right, data);
+        return;
+    }
+
+}
+
+void tree_clear(struct Tree* node){
+    if(node->left != NULL)
+        tree_clear(node->left);
+    if(node->right != NULL)
+        tree_clear(node->right);
+    free(node);
+}
+void  infoOutput ( struct Student *student){
+    printf("Фамилия: %s\n", student->surname);
+    printf("Имя: %s\n", student->name);
+    printf("Пол %s\n",student->sex);
+    printf("Возраст: %d\n",student->age);
+    printf("Группа: %d\n",student->group);
+    printf("Отметка по математике: %f\n",student->mathMark);
+    printf("Отметка по физеке: %f\n", student->physicsMark);
+    printf("Отметка по химии: %f\n",student->chemistryMark);
+}
+
+struct Student* initstudent(char *surname, char *name, char *sex, int age,int group,float mathMark,float physickMark,float chemistryMark){
+    struct Student* result = malloc(sizeof(struct Student));
+    result->surname = surname;
+    result->name = name;
+    result->sex =  sex;
+    result->age = age;
+    result->group = group;
+    result->mathMark = mathMark;
+    result->physicsMark = physickMark;
+    result->chemistryMark = chemistryMark;
+    result->infoOutput = infoOutput;
+    return  result;
+}
+void filter_students(struct Tree* node) {
+    if (node == NULL) {
+        return;
+    }
+
+    filter_students(node->left);
+
+    if (node->data.mathMark >= 4 && node->data.physicsMark >= 4,node->data.chemistryMark >= 4) {
+        node->data.infoOutput(&node->data);
+    }
+
+    filter_students(node->right);
+}
+
+void sr (struct Tree* tree) {
+    if (tree == NULL) {
+        return;
+
+    }
+    tree->data.age -= 3;
+
+
+}
+
+int main(){
+    system("chcp 65001");
+    struct Student* one = initstudent("Polyakova", "Olga", "f", 17, 207, 5.0, 4.0, 5.0);
+    struct Student* two = initstudent("Dremuhina", "Anastsia", "f", 18, 208, 5.0, 5.0, 3.0);
+    struct Student* three = initstudent("Adamov", "Adam", "m", 16, 209, 5.0, 5.0, 5.0);
+
+    struct Tree* students = tree_init(*one);
+    students->add_node(students, *two);
+    students->add_node(students, *three);
+
+    sr(students);
+    filter_students(students);
+
+    students->clear(students);
+
+    return 0;
+}
