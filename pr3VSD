@@ -1,0 +1,150 @@
+import tkinter as tk
+from tkinter import messagebox, ttk
+import pyodbc
+
+# Подключение к базе данных SQL Server
+conn = pyodbc.connect('Driver={SQL Server};'
+                      'Server=HOMENET134\SQLEXPRESS;'
+                      'Database=IvanovPR;'
+                      'Trusted_Connection=yes;')
+
+cursor = conn.cursor()
+
+# Функция для создания таблицы пользователей, если её нет
+def create_users_table():
+    cursor.execute('''
+        IF NOT EXISTS (SELECT * FROM sys.tables WHERE name='users')
+        CREATE TABLE users (
+            id INT IDENTITY(1,1) PRIMARY KEY,
+            username NVARCHAR(50) UNIQUE NOT NULL,
+            password NVARCHAR(50) NOT NULL
+        )
+    ''')
+    conn.commit()
+
+# Создание таблицы пользователей, если она ещё не создана
+create_users_table()
+
+# Функция для регистрации нового пользователя
+def register_user():
+    username = entry_username.get()
+    password = entry_password.get()
+
+    # Проверка длины пароля (минимум 6 символов)
+    if len(password) < 6:
+        messagebox.showerror('Ошибка', 'Пароль должен содержать минимум 6 символов.')
+        return
+    # Проверка наличия пользователя с таким же именем
+    cursor.execute('SELECT * FROM users WHERE username=?', username)
+    existing_user = cursor.fetchone()
+    if existing_user:
+        messagebox.showerror('Ошибка', 'Пользователь с таким именем уже существует.')
+    else:
+        cursor.execute('INSERT INTO users (username, password) VALUES (?, ?)', (username, password))
+        conn.commit()
+        messagebox.showinfo('Успех', 'Пользователь зарегистрирован успешно.')
+
+# Функция для аутентификации пользователя
+def authenticate_user():
+    username = entry_auth_username.get()
+    password = entry_auth_password.get()
+
+    cursor.execute('SELECT * FROM users WHERE username=? AND password=?', (username, password))
+    authenticated_user = cursor.fetchone()
+    if authenticated_user:
+        messagebox.showinfo('Успех', 'Аутентификация успешна.')
+    else:
+        messagebox.showerror('Ошибка', 'Неправильное имя пользователя или пароль.')
+
+# Функция для отображения окна с таблицами
+def show_tables_window():
+    tables_window = tk.Toplevel(root)
+    tables_window.title('Таблицы в базе данных')
+    
+    # Получаем список таблиц из базы данных
+    cursor.execute("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE='BASE TABLE'")
+    tables = [row.TABLE_NAME for row in cursor.fetchall()]
+    
+    # Создаем список для отображения таблиц
+    listbox_tables = tk.Listbox(tables_window, selectmode=tk.SINGLE)
+    for table in tables:
+        listbox_tables.insert(tk.END, table)
+    listbox_tables.pack(padx=20, pady=20)
+    
+    # Функция для отображения содержимого выбранной таблицы
+    def show_table_contents():
+        selected_index = listbox_tables.curselection()
+        if selected_index:
+            selected_table = listbox_tables.get(selected_index)
+            cursor.execute(f"SELECT * FROM {selected_table}")
+            table_contents = cursor.fetchall()
+            
+            # Создаем окно для отображения содержимого таблицы
+            table_window = tk.Toplevel(tables_window)
+            table_window.title(f'Содержимое таблицы {selected_table}')
+            
+            # Создаем таблицу для отображения данных
+            tree = ttk.Treeview(table_window)
+            tree["columns"] = tuple(cursor.description[i][0] for i in range(len(cursor.description)))
+            
+            # Устанавливаем заголовки колонок
+            tree.heading('#0', text='ID')
+            for i in range(len(cursor.description)):
+                tree.heading(f'#{i+1}', text=cursor.description[i][0])
+            
+            # Добавляем данные в таблицу
+            for row in table_contents:
+                tree.insert('', tk.END, values=row)
+            
+            tree.pack(expand=tk.YES, fill=tk.BOTH)
+    
+    # Кнопка для отображения содержимого выбранной таблицы
+    button_show_contents = tk.Button(tables_window, text='Показать содержимое таблицы', command=show_table_contents)
+    button_show_contents.pack(pady=10)
+
+# Создание основного окна
+root = tk.Tk()
+root.title('Регистрация и Аутентификация')
+
+# Разметка и виджеты для регистрации
+label_register = tk.Label(root, text='Регистрация нового пользователя')
+label_register.pack(pady=10)
+
+label_username = tk.Label(root, text='Имя пользователя:')
+label_username.pack()
+entry_username = tk.Entry(root)
+entry_username.pack(pady=5)
+
+label_password = tk.Label(root, text='Пароль (минимум 6 символов):')
+label_password.pack()
+entry_password = tk.Entry(root, show='*')
+entry_password.pack(pady=5)
+
+button_register = tk.Button(root, text='Зарегистрировать', command=register_user)
+button_register.pack(pady=10)
+
+# Разметка и виджеты для аутентификации
+label_authenticate = tk.Label(root, text='Аутентификация пользователя')
+label_authenticate.pack(pady=10)
+
+label_auth_username = tk.Label(root, text='Имя пользователя:')
+label_auth_username.pack()
+entry_auth_username = tk.Entry(root)
+entry_auth_username.pack(pady=5)
+
+label_auth_password = tk.Label(root, text='Пароль:')
+label_auth_password.pack()
+entry_auth_password = tk.Entry(root, show='*')
+entry_auth_password.pack(pady=5)
+
+button_authenticate = tk.Button(root, text='Войти', command=authenticate_user)
+button_authenticate.pack(pady=10)
+
+# Кнопка для отображения окна с таблицами
+button_show_tables = tk.Button(root, text='Показать таблицы', command=show_tables_window)
+button_show_tables.pack(pady=10)
+
+root.mainloop()
+
+# Закрытие соединения с базой данных после закрытия окна
+conn.close()
